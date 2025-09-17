@@ -1,0 +1,55 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // Get the code from our Git repository
+                git 'https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git'
+            }
+        }
+        stage('Build') {
+            steps {
+                script {
+                    // Define a custom image name
+                    def dockerImage = "my-nodejs-app:${env.BUILD_ID}"
+                    // Build the Docker image for our Node.js app
+                    sh "docker build -t ${dockerImage} ."
+                }
+            }
+        }
+        stage('Test') {
+            steps {
+                script {
+                    // This is a simple "smoke test": does the container run?
+                    // In a real project, you'd run automated tests here.
+                    def dockerImage = "my-nodejs-app:${env.BUILD_ID}"
+                    sh "docker run -d --name test-container ${dockerImage}"
+                    sleep(5) // Wait for the app to start
+                    sh "docker logs test-container"
+                    sh "docker stop test-container"
+                    sh "docker rm test-container"
+                }
+            }
+        }
+        stage('Deploy') {
+            steps {
+                script {
+                    // "Deploy" by running the container on port 8000
+                    def dockerImage = "my-nodejs-app:${env.BUILD_ID}"
+                    // Stop and remove any old container with the same name
+                    sh "docker stop my-app-instance || true"
+                    sh "docker rm my-app-instance || true"
+                    // Run the new container
+                    sh "docker run -d --name my-app-instance -p 8000:3000 ${dockerImage}"
+                }
+            }
+        }
+    }
+    post {
+        always {
+            // Clean up old Docker images to save space
+            sh 'echo "Pipeline finished."'
+        }
+    }
+}
